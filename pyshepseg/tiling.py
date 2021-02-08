@@ -47,6 +47,7 @@ TEMPFILES_EXT = 'kea'
 
 DFLT_TILESIZE = 4096
 DFLT_OVERLAPSIZE = 200
+DFLT_CHUNKSIZE = 10000
 
 def fitSpectralClustersWholeFile(inDs, bandNumbers, numClusters=60, 
         subsamplePcnt=None, imgNullVal=None, 
@@ -652,7 +653,8 @@ def crossesMidline(overlap, segLoc, orientation):
     return ((minN < mid) & (maxN >= mid))
 
 
-def calcHistogramTiled(segfile, maxSegId, writeToRat=True):
+def calcHistogramTiled(segfile, maxSegId, chunkSize=DFLT_CHUNKSIZE, 
+                                writeToRat=True):
     """
     Calculate a histogram of the given segment image file. 
     
@@ -681,11 +683,6 @@ def calcHistogramTiled(segfile, maxSegId, writeToRat=True):
     object should be opened for update. 
     
     """
-    # This is the histogram array, indexed by segment ID. 
-    # Currently just in memory, it could be quite large, 
-    # depending on how many segments there are.
-    hist = numpy.zeros((maxSegId+1), dtype=numpy.uint32)
-    
     # Open the file
     if isinstance(segfile, gdal.Dataset):
         ds = segfile
@@ -693,6 +690,40 @@ def calcHistogramTiled(segfile, maxSegId, writeToRat=True):
         ds = gdal.Open(segfile, gdal.GA_Update)
     segband = ds.GetRasterBand(1)
     
+    chunkMinVal = 0
+    chunkMaxVal = chunkSize# - 1 # is inclusive
+
+    attrTbl = segband.GetDefaultRAT()
+
+    while chunkMinVal < maxSegId:
+        if chunkMaxVal > maxSegId:
+            chunkMaxVal = maxSegId + 1
+    
+        print('chunk', chunkMinVal, chunkMaxVal)
+        hist = calcHistogramTiledChunk(segband, attrTbl, chunkMinVal, 
+                        chunkMaxVal)
+
+        if writeToRat:
+            numTableRows = int(chunkMaxVal)
+            if attrTbl.GetRowCount() != numTableRows:
+                attrTbl.SetRowCount(numTableRows)
+            colNum = attrTbl.GetColOfUsage(gdal.GFU_PixelCount)
+            if colNum == -1:
+                attrTbl.CreateColumn('Histogram', gdal.GFT_Integer, gdal.GFU_PixelCount)
+                colNum = attrTbl.GetColumnCount() - 1
+                
+            attrTbl.WriteArray(hist, colNum, chunkMinVal)
+            
+        chunkMinVal += chunkSize
+        chunkMaxVal += chunkSize
+
+    return hist
+
+def calcHistogramTiledChunk(segband, attrTbl, chunkMinVal, chunkMaxVal):
+
+    chunkSize = chunkMaxVal - chunkMinVal
+    hist = numpy.zeros((chunkSize,), dtype=numpy.uint32)
+
     tileSize = 1024
     (nlines, npix) = (segband.YSize, segband.XSize)
     numXtiles = int(numpy.ceil(npix / tileSize))
@@ -704,27 +735,19 @@ def calcHistogramTiled(segfile, maxSegId, writeToRat=True):
             leftPix = tileCol * tileSize
             xsize = min(tileSize, npix-leftPix)
             ysize = min(tileSize, nlines-topLine)
-            
+
             tileData = segband.ReadAsArray(leftPix, topLine, xsize, ysize)
-            updateCounts(tileData, hist)
+            updateCounts(tileData, hist, chunkMinVal, chunkMaxVal)
 
     # Set the histogram count for the null segment to zero
-    hist[shepseg.SEGNULLVAL] = 0
-
-    if writeToRat:
-        attrTbl = segband.GetDefaultRAT()
-        numTableRows = int(maxSegId + 1)
-        if attrTbl.GetRowCount() != numTableRows:
-            attrTbl.SetRowCount(numTableRows)
-        attrTbl.CreateColumn('Histogram', gdal.GFT_Integer, gdal.GFU_PixelCount)
-        colNum = attrTbl.GetColumnCount() - 1
-        attrTbl.WriteArray(hist, colNum)
-
+    # only on first chink
+    if chunkMinVal == 0:
+        hist[shepseg.SEGNULLVAL] = 0
+        
     return hist
 
-
 @njit
-def updateCounts(tileData, hist):
+def updateCounts(tileData, hist, minVal, maxVal):
     """
     Fast function to increment counts for each segment ID
     """
@@ -732,7 +755,8 @@ def updateCounts(tileData, hist):
     for i in range(nrows):
         for j in range(ncols):
             segid = tileData[i, j]
-            hist[segid] += 1
+            if segid >= minVal and segid < maxVal:
+                hist[segid - minVal] += 1
 
 
 class PyShepSegTilingError(Exception): pass
