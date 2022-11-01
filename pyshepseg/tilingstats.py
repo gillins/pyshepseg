@@ -587,7 +587,7 @@ def equalProjection(proj1, proj2):
 
 
 @njit
-def userFuncVariogram(tile, imgNullVal, intArr, floatArr, maxDist):
+def userFuncVariogram(pts, imgNullVal, intArr, floatArr, maxDist):
     """
     Calculates the variogram at the given distance for the segment
     contained in the tile.     
@@ -596,28 +596,24 @@ def userFuncVariogram(tile, imgNullVal, intArr, floatArr, maxDist):
     distances.
     """
 
+    nPts = len(pts)
+    maxDistSqrd = maxDist**2
     counts = numpy.zeros((maxDist,), dtype=numpy.uint32)
     sumDifSqs = numpy.zeros((maxDist,), dtype=numpy.float64)
-    ysize, xsize = tile.shape
-    for y in range(ysize):
-        for x in range(xsize):
-            val = tile[y, x]
-            if val == imgNullVal:
-                continue
-                
-            for yoffset in range(1, maxDist + 1):
-                for xoffset in range(1, maxDist + 1):
-                    if (y + yoffset) < ysize and (x + xoffset) < xsize:
-                        val2 = tile[y + yoffset, x + xoffset]
-                        if val2 == imgNullVal:
-                            continue                       
 
-                        # note: 'bin' dist by converting to integer
-                        dist = int(numpy.sqrt(yoffset * yoffset + xoffset * xoffset))
-                        if dist <= maxDist and dist > 0:
-                            counts[dist - 1] += 1
-                            sumDifSqs[dist - 1] += (val - val2)**2
-                        
+    for i in range(nPts-1):
+        for j in range(i+1, nPts):
+            if pts[j].val != imgNullVal and pts[i].val != imgNullVal:
+                xd = pts[j].x - pts[i].x
+                yd = pts[j].y - pts[i].y
+                distSqrd = xd*xd + yd*yd
+                if distSqrd <= maxDistSqrd:
+                    dist = int(round(numpy.sqrt(distSqrd)))
+                    if dist <= maxDist:
+                        counts[dist-1] += 1
+                        sumDifSqs[dist-1] += (pts[j].val - pts[i].val) ** 2
+                    
+
     for n in range(maxDist):
         if counts[n] == 0:
             floatArr[n] = -9999  # TODO: pass in missingStatsValue?
@@ -626,84 +622,84 @@ def userFuncVariogram(tile, imgNullVal, intArr, floatArr, maxDist):
 
 
 @njit
-def userFuncVariogram1(tile, imgNullVal, intArr, floatArr):
+def userFuncVariogram1(pts, imgNullVal, intArr, floatArr):
     """
     Calculates distance=1 variogram and can be used as a parameter
     to :func:`calcPerSegmentSpatialStatsTiled`.
     """
-    userFuncVariogram(tile, imgNullVal, intArr, floatArr, 1)
+    userFuncVariogram(pts, imgNullVal, intArr, floatArr, 1)
 
 
 @njit
-def userFuncVariogram2(tile, imgNullVal, intArr, floatArr):
+def userFuncVariogram2(pts, imgNullVal, intArr, floatArr):
     """
     Calculates distance=1, 2 variograms and can be used as a parameter
     to :func:`calcPerSegmentSpatialStatsTiled`.
     """
-    userFuncVariogram(tile, imgNullVal, intArr, floatArr, 2)
+    userFuncVariogram(pts, imgNullVal, intArr, floatArr, 2)
 
 
 @njit
-def userFuncVariogram3(tile, imgNullVal, intArr, floatArr):
+def userFuncVariogram3(pts, imgNullVal, intArr, floatArr):
     """
     Calculates distance=1-3 variograms and can be used as a parameter
     to :func:`calcPerSegmentSpatialStatsTiled`.
     """
-    userFuncVariogram(tile, imgNullVal, intArr, floatArr, 3)
+    userFuncVariogram(pts, imgNullVal, intArr, floatArr, 3)
 
 
 @njit
-def userFuncVariogram4(tile, imgNullVal, intArr, floatArr):
+def userFuncVariogram4(pts, imgNullVal, intArr, floatArr):
     """
     Calculates distance=1-4 variograms and can be used as a parameter
     to :func:`calcPerSegmentSpatialStatsTiled`.
     """
-    userFuncVariogram(tile, imgNullVal, intArr, floatArr, 4)
+    userFuncVariogram(pts, imgNullVal, intArr, floatArr, 4)
 
 
 @njit
-def userFuncVariogram5(tile, imgNullVal, intArr, floatArr):
+def userFuncVariogram5(pts, imgNullVal, intArr, floatArr):
     """
     Calculates distance=1-5 variograms and can be used as a parameter
     to :func:`calcPerSegmentSpatialStatsTiled`.
     """
-    userFuncVariogram(tile, imgNullVal, intArr, floatArr, 5)
+    userFuncVariogram(pts, imgNullVal, intArr, floatArr, 5)
 
 
 @njit
-def userFuncVariogram6(tile, imgNullVal, intArr, floatArr):
+def userFuncVariogram6(pts, imgNullVal, intArr, floatArr):
     """
     Calculates distance=1-6 variograms and can be used as a parameter
     to :func:`calcPerSegmentSpatialStatsTiled`.
     """
-    userFuncVariogram(tile, imgNullVal, intArr, floatArr, 6)
+    userFuncVariogram(pts, imgNullVal, intArr, floatArr, 6)
 
 
 @njit
-def userFuncVariogram7(tile, imgNullVal, intArr, floatArr):
+def userFuncVariogram7(pts, imgNullVal, intArr, floatArr):
     """
     Calculates distance=1-7 variograms and can be used as a parameter
     to :func:`calcPerSegmentSpatialStatsTiled`.
     """
-    userFuncVariogram(tile, imgNullVal, intArr, floatArr, 7)
+    userFuncVariogram(pts, imgNullVal, intArr, floatArr, 7)
 
 
 @njit
-def userFuncVariogram8(tile, imgNullVal, intArr, floatArr):
+def userFuncVariogram8(pts, imgNullVal, intArr, floatArr):
     """
     Calculates distance=1-8 variograms and can be used as a parameter
     to :func:`calcPerSegmentSpatialStatsTiled`.
     """
-    userFuncVariogram(tile, imgNullVal, intArr, floatArr, 8)
+    userFuncVariogram(pts, imgNullVal, intArr, floatArr, 8)
 
 
 @njit
-def userFuncVariogram9(tile, imgNullVal, intArr, floatArr):
+def userFuncVariogram9(pts, imgNullVal, intArr, floatArr):
     """
     Calculates distance=1-9 variograms and can be used as a parameter
     to :func:`calcPerSegmentSpatialStatsTiled`.
     """
-    userFuncVariogram(tile, imgNullVal, intArr, floatArr, 9)
+    userFuncVariogram(pts, imgNullVal, intArr, floatArr, 9)
 
 
 SegPointSpec = [('x', types.uint32), 
@@ -1023,9 +1019,9 @@ def calcStatsForCompletedSegsSpatial(segDict, noDataDict, missingStatsValue, pag
             segList = segDict[segId]
             if len(segList) > 0:
                 # convert to a tile 2D structure before calling the user's function
-                tile = convertPtsInto2DArray(segList, imgNullVal)
+                #tile = convertPtsInto2DArray(segList, imgNullVal)
                 # call userFunc
-                userFunc(tile, imgNullVal, intArr, floatArr)
+                userFunc(segList, imgNullVal, intArr, floatArr)
                 # now write the outputs for the different types 
                 for n in range(statsSelection_fast.shape[0]):
                     colType = statsSelection_fast[n, STATSEL_COLTYPE]
